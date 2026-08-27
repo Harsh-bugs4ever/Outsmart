@@ -1,14 +1,13 @@
-﻿# Outsmart
+﻿## How it works
 
-Upgrades your dependencies and fixes what the upgrade breaks.
+1. Pulls real vulnerability advisories for the target repo
+2. Spawns one worker per affected package
+3. Each worker bumps, installs, and runs the test suite in an isolated sandbox
+4. If tests break, the worker reads the failure and repairs it
+5. Re-verifies from a clean checkout before opening anything
+6. Opens a pull request — and stops. Merging is a human decision.
 
-Dependabot opens the PR and walks away. Outsmart stays until the tests are green.
+## Built with
 
-## What it does
-
-Point it at a repo. It pulls real advisories, spawns one worker per vulnerable
-package, and each worker bumps the version, runs the test suite in a sandbox,
-and repairs whatever the upgrade broke. Only green branches become pull requests.
-
-Merging stays a human decision.
-
+- [TrueForge](https://trueforge.dev) — agent harness (MCP, sandbox, approval gates, subagents)
+- Qodo — AI code review on every pull request in this repo
