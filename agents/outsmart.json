@@ -45,6 +45,11 @@
       "ask_user_questions": {
         "enabled": true
       }
-    }
+    },
+    "skills": [
+      {
+        "name": "npm-upgrade"
+      }
+    ]
   }
 }
