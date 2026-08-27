@@ -14,7 +14,7 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=ubuntu
+User=__RUN_USER__
 WorkingDirectory=/opt/outsmart
 
 # The sandbox runtime creates its proxy socket at $TMPDIR/claude-http-<id>.sock.
@@ -23,6 +23,13 @@ WorkingDirectory=/opt/outsmart
 # with "ProxyError: Cannot connect to proxy".
 Environment=TMPDIR=/tmp/claude
 Environment=PORT=8790
+
+# Bind to loopback only. TrueForge already defaults to localhost
+# (DEFAULT_HOST = "localhost", passed as `hostname` to @hono/node-server), but
+# this is a security property and should not depend on an upstream default:
+# anything that can reach this port bypasses Caddy's authentication and talks
+# straight to a harness that executes code.
+Environment=HOST=127.0.0.1
 ExecStartPre=/usr/bin/mkdir -p /tmp/claude
 
 # --no-network-family-autoselection: on NAT64 networks Node's happy-eyeballs
