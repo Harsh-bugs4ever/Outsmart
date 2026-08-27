@@ -67,7 +67,9 @@ fi
 
 log "Installing TrueForge ${TRUEFORGE_VERSION} into ${INSTALL_DIR}"
 mkdir -p "$INSTALL_DIR"
-chown "$RUN_USER":"$RUN_USER" "$INSTALL_DIR"
+# "user:" (no group) assigns the user's own primary group, which is not always
+# named after the user - assuming it is breaks provisioning under set -e.
+chown "$RUN_USER": "$INSTALL_DIR"
 sudo -u "$RUN_USER" bash -c "cd '$INSTALL_DIR' && [ -f package.json ] || npm init -y >/dev/null"
 sudo -u "$RUN_USER" bash -c "cd '$INSTALL_DIR' && npm install --no-audit --no-fund '@truefoundry/trueforge@${TRUEFORGE_VERSION}'"
 

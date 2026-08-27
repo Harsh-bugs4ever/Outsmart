@@ -3,8 +3,16 @@
 # Binds to localhost only. Caddy terminates TLS and handles auth in front of it
 # - standalone mode ignores OIDC entirely, so authentication cannot live here.
 #
-# Install:
-#   sudo cp deploy/trueforge.service /etc/systemd/system/
+# This is a TEMPLATE, not a ready-to-install unit: User= carries a
+# __RUN_USER__ placeholder that must be substituted with the account the
+# harness was provisioned under. deploy/setup.sh does this for you.
+#
+# Install (normal path):
+#   sudo ./deploy/setup.sh          # installs this unit with the right user
+#   sudo systemctl enable --now trueforge
+#
+# Install (by hand):
+#   sed "s/__RUN_USER__/$USER/" deploy/trueforge.service #     | sudo tee /etc/systemd/system/trueforge.service > /dev/null
 #   sudo systemctl daemon-reload && sudo systemctl enable --now trueforge
 
 [Unit]
