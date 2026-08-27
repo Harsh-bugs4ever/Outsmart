@@ -11,12 +11,18 @@
 #   sudo ./deploy/setup.sh          # installs this unit with the right user
 #   sudo systemctl enable --now trueforge
 #
-# Install (by hand):
-#   sed "s/__RUN_USER__/$USER/" deploy/trueforge.service | sudo tee /etc/systemd/system/trueforge.service > /dev/null
+# Install (by hand). Name the account explicitly - it must be the same
+# unprivileged user setup.sh provisioned under, since the harness database
+# lives in that user's home directory. Never root: the sandbox is what confines
+# generated code, and running the harness as root removes the point of it.
+#
+#   RUN_AS=ubuntu   # <- replace with the provisioning account
+#   sed "s/__RUN_USER__/$RUN_AS/" deploy/trueforge.service | sudo tee /etc/systemd/system/trueforge.service > /dev/null
 #   sudo systemctl daemon-reload && sudo systemctl enable --now trueforge
 #
-# Kept on one line deliberately: a "\" continuation would be joined with the
-# next comment line, and the "#" would then comment out the pipe.
+# Deliberately not $USER: run from a root shell it expands to root. And the
+# sed is kept on one line - a "\" continuation would join with the next
+# comment line, and the "#" would comment out the pipe.
 
 [Unit]
 Description=Outsmart harness (TrueForge standalone)
