@@ -51,12 +51,19 @@ discovering it later when every sandbox turn dies.
 
 ## 3. Run the harness
 
+`setup.sh` already installed the unit, substituting the user it provisioned as.
+If you ran it under an account other than `ubuntu`, that is the account the
+service uses — set `OUTSMART_USER` when provisioning to choose explicitly.
+
 ```bash
-sudo cp deploy/trueforge.service /etc/systemd/system/
-sudo systemctl daemon-reload
 sudo systemctl enable --now trueforge
 journalctl -u trueforge -f
 ```
+
+The unit sets `HOST=127.0.0.1`, so the harness listens on loopback only and is
+reachable exclusively through Caddy. **Never open port 8790 in the security
+group** — the harness has no authentication of its own, so anything that
+reaches it directly can execute code and spend your model credits.
 
 Look for this line. If it says *unavailable*, stop and fix it before going on:
 

@@ -3,9 +3,26 @@
 # Binds to localhost only. Caddy terminates TLS and handles auth in front of it
 # - standalone mode ignores OIDC entirely, so authentication cannot live here.
 #
-# Install:
-#   sudo cp deploy/trueforge.service /etc/systemd/system/
+# This is a TEMPLATE, not a ready-to-install unit: User= carries a
+# __RUN_USER__ placeholder that must be substituted with the account the
+# harness was provisioned under. deploy/setup.sh does this for you.
+#
+# Install (normal path):
+#   sudo ./deploy/setup.sh          # installs this unit with the right user
+#   sudo systemctl enable --now trueforge
+#
+# Install (by hand). Name the account explicitly - it must be the same
+# unprivileged user setup.sh provisioned under, since the harness database
+# lives in that user's home directory. Never root: the sandbox is what confines
+# generated code, and running the harness as root removes the point of it.
+#
+#   RUN_AS=ubuntu   # <- replace with the provisioning account
+#   sed "s/__RUN_USER__/$RUN_AS/" deploy/trueforge.service | sudo tee /etc/systemd/system/trueforge.service > /dev/null
 #   sudo systemctl daemon-reload && sudo systemctl enable --now trueforge
+#
+# Deliberately not $USER: run from a root shell it expands to root. And the
+# sed is kept on one line - a "\" continuation would join with the next
+# comment line, and the "#" would comment out the pipe.
 
 [Unit]
 Description=Outsmart harness (TrueForge standalone)
@@ -14,7 +31,7 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=ubuntu
+User=__RUN_USER__
 WorkingDirectory=/opt/outsmart
 
 # The sandbox runtime creates its proxy socket at $TMPDIR/claude-http-<id>.sock.
@@ -23,6 +40,13 @@ WorkingDirectory=/opt/outsmart
 # with "ProxyError: Cannot connect to proxy".
 Environment=TMPDIR=/tmp/claude
 Environment=PORT=8790
+
+# Bind to loopback only. TrueForge already defaults to localhost
+# (DEFAULT_HOST = "localhost", passed as `hostname` to @hono/node-server), but
+# this is a security property and should not depend on an upstream default:
+# anything that can reach this port bypasses Caddy's authentication and talks
+# straight to a harness that executes code.
+Environment=HOST=127.0.0.1
 ExecStartPre=/usr/bin/mkdir -p /tmp/claude
 
 # --no-network-family-autoselection: on NAT64 networks Node's happy-eyeballs

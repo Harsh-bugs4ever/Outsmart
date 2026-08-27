@@ -7,7 +7,7 @@
 #
 set -euo pipefail
 
-RUN_USER="${SUDO_USER:-ubuntu}"
+RUN_USER="${OUTSMART_USER:-${SUDO_USER:-ubuntu}}"
 INSTALL_DIR="/opt/outsmart"
 TRUEFORGE_VERSION="0.1.4"
 
@@ -15,6 +15,14 @@ log() { printf '\n==> %s\n' "$*"; }
 
 if [[ $EUID -ne 0 ]]; then
   echo "Run with sudo." >&2
+  exit 1
+fi
+
+# The systemd unit runs as this user and reads its home directory for the
+# harness database, so provisioning and running must agree on who that is.
+# Override with OUTSMART_USER=... when sudo is invoked as root directly.
+if ! id -u "$RUN_USER" >/dev/null 2>&1; then
+  echo "User '$RUN_USER' does not exist. Set OUTSMART_USER to an existing user." >&2
   exit 1
 fi
 
@@ -59,7 +67,9 @@ fi
 
 log "Installing TrueForge ${TRUEFORGE_VERSION} into ${INSTALL_DIR}"
 mkdir -p "$INSTALL_DIR"
-chown "$RUN_USER":"$RUN_USER" "$INSTALL_DIR"
+# "user:" (no group) assigns the user's own primary group, which is not always
+# named after the user - assuming it is breaks provisioning under set -e.
+chown "$RUN_USER": "$INSTALL_DIR"
 sudo -u "$RUN_USER" bash -c "cd '$INSTALL_DIR' && [ -f package.json ] || npm init -y >/dev/null"
 sudo -u "$RUN_USER" bash -c "cd '$INSTALL_DIR' && npm install --no-audit --no-fund '@truefoundry/trueforge@${TRUEFORGE_VERSION}'"
 
@@ -74,4 +84,10 @@ if ! command -v caddy >/dev/null; then
   apt-get install -y -qq caddy
 fi
 
-log "Done. Next: install the systemd unit and Caddyfile (see deploy/README.md)"
+log "Installing the systemd unit for user ${RUN_USER}"
+HERE="$(dirname "$(readlink -f "$0")")"
+sed "s/__RUN_USER__/${RUN_USER}/" "${HERE}/trueforge.service" > /etc/systemd/system/trueforge.service
+systemctl daemon-reload
+
+log "Done. Start it with: systemctl enable --now trueforge"
+log "Then put Caddy in front - see deploy/README.md. Never expose port 8790 directly."
