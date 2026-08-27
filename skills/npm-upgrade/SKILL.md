@@ -17,30 +17,30 @@ Resolve the tree first. This needs no network install and takes seconds:
 npm install --package-lock-only
 ```
 
-Then collect every `name@version` from `package-lock.json` by walking the
-`packages` object. For each entry, the registry package name is the entry's
-own `name` field when it has one, and only otherwise the segment after the
-last `node_modules/` in its path:
+Then scan it. This skill ships the scanner, so use it rather than
+reimplementing the walk:
 
-```python
-if meta.get("link") or "version" not in meta:
-    continue                      # workspace / link placeholder, not a package
-real_name = meta.get("name") or path.split("node_modules/")[-1]
+```bash
+python3 /opt/tfy/skills/npm-upgrade/scripts/scan_lockfile.py package-lock.json
 ```
 
-Skip the root entry (empty path) and any entry with `link: true`. Those are
-placeholders pointing at a local directory: npm records no version on them and
-lists the link target separately, so there is nothing to query. Including them
-produces either an invalid query or a versionless one that returns every
-advisory for a name that is not really installed.
+It prints one line per vulnerable package with its advisory IDs, and a summary.
+It handles the parts that are easy to get wrong and that fail *quietly*:
 
-This matters for **aliased** dependencies. `"foo": "npm:bar@1.2.3"` installs
-`bar` at the path `node_modules/foo`, and npm records the real name in the
-entry's `name` field. Taking the name from the path alone queries `foo`,
-which is a different package or none at all — so advisories affecting the
-package that is actually installed are silently missed.
+- **Aliases** — `"foo": "npm:bar@1.2.3"` installs `bar` at `node_modules/foo`.
+  The real name is in the entry's `name` field; the path holds the alias.
+- **Root and link entries** — the root project has an empty path, and workspace
+  links carry `link: true` with no version. Neither is an installed package.
+- **Pagination** — OSV paginates past 1,000 vulnerabilities for one query or
+  3,000 for a batch. Unfollowed `next_page_token`s silently under-report.
+- **Batch size** — queries are chunked so one oversized request cannot fail the
+  whole scan.
 
-Expect several hundred entries for a small project; most vulnerabilities are
+Every one of those failures produces *fewer* advisories rather than an error,
+which is the dangerous direction for a security scan. If you scan by hand
+instead, reproduce all four.
+
+Expect several hundred packages for a small project; most vulnerabilities are
 transitive and appear nowhere in the manifest.
 
 ## Query OSV correctly
