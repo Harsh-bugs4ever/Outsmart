@@ -30,10 +30,18 @@ def collect(lock):
         name = meta.get("name") or path.split("node_modules/")[-1]
         if name:
             found.add((name, meta["version"]))
-    # lockfile v1 fallback
-    for name, meta in (lock.get("dependencies") or {}).items():
-        if isinstance(meta, dict) and "version" in meta:
-            found.add((name, meta["version"]))
+    # lockfile v1 fallback. v1 nests transitives inside each entry's own
+    # `dependencies` object, so this must recurse - walking only the top level
+    # scans direct dependencies and silently misses everything beneath them.
+    def walk_v1(deps):
+        for name, meta in (deps or {}).items():
+            if not isinstance(meta, dict):
+                continue
+            if "version" in meta:
+                found.add((name, meta["version"]))
+            walk_v1(meta.get("dependencies"))
+
+    walk_v1(lock.get("dependencies"))
     return sorted(found)
 
 
