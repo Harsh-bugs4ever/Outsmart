@@ -1,0 +1,42 @@
+# Outsmart harness (TrueForge, standalone mode).
+#
+# Binds to localhost only. Caddy terminates TLS and handles auth in front of it
+# - standalone mode ignores OIDC entirely, so authentication cannot live here.
+#
+# Install:
+#   sudo cp deploy/trueforge.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now trueforge
+
+[Unit]
+Description=Outsmart harness (TrueForge standalone)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/opt/outsmart
+
+# The sandbox runtime creates its proxy socket at $TMPDIR/claude-http-<id>.sock.
+# TrueForge only bind-mounts /tmp/claude and /tmp/tf_cms into the sandbox, so
+# without this the socket is invisible inside it and every sandbox init fails
+# with "ProxyError: Cannot connect to proxy".
+Environment=TMPDIR=/tmp/claude
+Environment=PORT=8790
+ExecStartPre=/usr/bin/mkdir -p /tmp/claude
+
+# --no-network-family-autoselection: on NAT64 networks Node's happy-eyeballs
+# connector races IPv4 and IPv6 and times out on both, making some model
+# providers unreachable with a bare "Cannot connect to API".
+ExecStart=/usr/bin/node \
+  --no-network-family-autoselection \
+  --dns-result-order=ipv4first \
+  /opt/outsmart/node_modules/@truefoundry/trueforge/dist/cli.js
+
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

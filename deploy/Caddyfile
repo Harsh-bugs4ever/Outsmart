@@ -1,0 +1,28 @@
+# TLS + authentication in front of the harness.
+#
+# TrueForge standalone mode has no authentication of its own - it logs
+# "Auth is disabled; browser login is off" and its docs say to keep it on
+# localhost. OIDC only works in hosted mode, and hosted mode disables the
+# local sandbox, which Outsmart depends on. So auth lives at the edge.
+#
+# Replace HOSTNAME with your domain, or use a wildcard DNS service that maps
+# an IP into a hostname, e.g. 13-49-1-2.sslip.io - Let's Encrypt issues for
+# those, so you do not need to buy a domain.
+#
+# Generate the password hash with:  caddy hash-password
+#
+# Install:
+#   sudo cp deploy/Caddyfile /etc/caddy/Caddyfile
+#   sudo systemctl reload caddy
+
+HOSTNAME {
+	basic_auth {
+		# username  <bcrypt hash from `caddy hash-password`>
+		outsmart REPLACE_WITH_HASH
+	}
+
+	reverse_proxy 127.0.0.1:8790 {
+		# Agent turns stream over long-lived connections; do not cut them off.
+		flush_interval -1
+	}
+}
