@@ -23,8 +23,16 @@ own `name` field when it has one, and only otherwise the segment after the
 last `node_modules/` in its path:
 
 ```python
+if meta.get("link") or "version" not in meta:
+    continue                      # workspace / link placeholder, not a package
 real_name = meta.get("name") or path.split("node_modules/")[-1]
 ```
+
+Skip the root entry (empty path) and any entry with `link: true`. Those are
+placeholders pointing at a local directory: npm records no version on them and
+lists the link target separately, so there is nothing to query. Including them
+produces either an invalid query or a versionless one that returns every
+advisory for a name that is not really installed.
 
 This matters for **aliased** dependencies. `"foo": "npm:bar@1.2.3"` installs
 `bar` at the path `node_modules/foo`, and npm records the real name in the
