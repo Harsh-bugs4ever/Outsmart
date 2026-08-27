@@ -12,8 +12,11 @@
 #   sudo systemctl enable --now trueforge
 #
 # Install (by hand):
-#   sed "s/__RUN_USER__/$USER/" deploy/trueforge.service #     | sudo tee /etc/systemd/system/trueforge.service > /dev/null
+#   sed "s/__RUN_USER__/$USER/" deploy/trueforge.service | sudo tee /etc/systemd/system/trueforge.service > /dev/null
 #   sudo systemctl daemon-reload && sudo systemctl enable --now trueforge
+#
+# Kept on one line deliberately: a "\" continuation would be joined with the
+# next comment line, and the "#" would then comment out the pipe.
 
 [Unit]
 Description=Outsmart harness (TrueForge standalone)
