@@ -24,7 +24,8 @@ def collect(lock):
     the alias, so the field wins when present.
     """
     found = set()
-    for path, meta in (lock.get("packages") or {}).items():
+    packages = lock.get("packages") or {}
+    for path, meta in packages.items():
         if not path or meta.get("link") or "version" not in meta:
             continue
         name = meta.get("name") or path.split("node_modules/")[-1]
@@ -41,7 +42,12 @@ def collect(lock):
                 found.add((name, meta["version"]))
             walk_v1(meta.get("dependencies"))
 
-    walk_v1(lock.get("dependencies"))
+    # Only when there is no `packages` tree. v2 lockfiles carry both, and the
+    # legacy tree records alias names against "npm:..." specifiers rather than
+    # resolved versions - querying those asks OSV about packages that are not
+    # installed.
+    if not packages:
+        walk_v1(lock.get("dependencies"))
     return sorted(found)
 
 
