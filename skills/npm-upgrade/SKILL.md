@@ -17,10 +17,23 @@ Resolve the tree first. This needs no network install and takes seconds:
 npm install --package-lock-only
 ```
 
-Then collect every `name@version` from `package-lock.json` — walk the
-`packages` object and take the segment after the last `node_modules/` in each
-path. Expect several hundred entries for a small project; most vulnerabilities
-are transitive and appear nowhere in the manifest.
+Then collect every `name@version` from `package-lock.json` by walking the
+`packages` object. For each entry, the registry package name is the entry's
+own `name` field when it has one, and only otherwise the segment after the
+last `node_modules/` in its path:
+
+```python
+real_name = meta.get("name") or path.split("node_modules/")[-1]
+```
+
+This matters for **aliased** dependencies. `"foo": "npm:bar@1.2.3"` installs
+`bar` at the path `node_modules/foo`, and npm records the real name in the
+entry's `name` field. Taking the name from the path alone queries `foo`,
+which is a different package or none at all — so advisories affecting the
+package that is actually installed are silently missed.
+
+Expect several hundred entries for a small project; most vulnerabilities are
+transitive and appear nowhere in the manifest.
 
 ## Query OSV correctly
 
