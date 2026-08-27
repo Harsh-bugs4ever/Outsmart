@@ -92,12 +92,23 @@ Model providers, the GitHub connector and the saved agent live in
 `~/.local/share/trueforge/db/db.sqlite`, which is per-instance. A fresh
 deployment starts empty.
 
-Add providers and the GitHub connector through Settings in the UI, then load
-the agent definition:
+Add providers and the GitHub connector through Settings in the UI, then
+register the skills and load the agent definition, in that order:
 
 ```bash
+./scripts/load-skills.sh
 ./scripts/load-agent.sh
 ```
+
+Order matters: the agent references skills by name, so a skill the harness has
+not been told about leaves the agent advertising a capability it cannot use.
+
+`load-skills.sh` registers this repository as the skill source — the harness
+clones it and materialises the skill under `/opt/tfy/skills/<name>` inside the
+sandbox when the model decides it is relevant. Nothing is copied to the host.
+It reads the repository URL from the `origin` remote and pins `main`; override
+with `OUTSMART_REPO_URL` and `OUTSMART_REPO_REF` when deploying from a fork or
+a tag.
 
 ## Security notes
 
