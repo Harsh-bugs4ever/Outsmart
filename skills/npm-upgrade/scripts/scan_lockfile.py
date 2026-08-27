@@ -60,7 +60,20 @@ def query(pkgs):
         ]
         index = list(range(len(batch)))
         while pending:
-            results = post({"queries": pending}).get("results", [])
+            response = post({"queries": pending})
+            if "results" not in response:
+                raise RuntimeError(
+                    f"OSV response has no 'results' field: {sorted(response)}"
+                )
+            results = response["results"]
+            # A short response would silently drop packages under zip() and
+            # still print a clean summary - the exact failure this scanner
+            # exists to prevent. Refuse to continue instead.
+            if len(results) != len(pending):
+                raise RuntimeError(
+                    f"OSV returned {len(results)} results for "
+                    f"{len(pending)} queries; scan is incomplete"
+                )
             nxt, nxt_index = [], []
             for slot, res in zip(index, results):
                 name, version = batch[slot]
