@@ -37,8 +37,10 @@ transitive and appear nowhere in the manifest.
 
 ## Query OSV correctly
 
-Send the whole tree in **one** request. Never loop per package — hundreds of
-sequential requests will exceed command timeouts.
+Batch the queries. Never loop one request per package — hundreds of sequential
+requests will exceed command timeouts. A few hundred packages go in a single
+request comfortably; chunk very large trees into batches of a few hundred and
+merge the results, so one oversized request cannot fail the whole scan.
 
 ```
 POST https://api.osv.dev/v1/querybatch
@@ -53,6 +55,13 @@ implausibly large, this is why. Cross-check one package against
 
 Results come back in request order, and packages with no advisories return an
 empty object `{}` — not a missing entry. Only a non-empty `vulns` array counts.
+
+**Handle pagination or the scan is silently incomplete.** OSV paginates when a
+single query returns more than 1,000 vulnerabilities, or the batch returns more
+than 3,000 in total. Any result carrying a `next_page_token` has more to give.
+Re-submit only those queries with their `page_token` set, omitting the ones
+that finished, and merge each page into the result for that package. Ignoring
+the token under-reports, which is the failure mode that matters here.
 
 Fetch severity and fixed versions with `GET https://api.osv.dev/v1/vulns/{id}`,
 and only for the advisories that matter.
