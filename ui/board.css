@@ -105,3 +105,5 @@ button:disabled { opacity: 0.5; cursor: default; }
 button.approve { background: #14532d; border-color: #1a6b3a; }
 button.reject  { background: #4c1d1d; border-color: #6b2626; }
 .pending-tool { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; font-family: ui-monospace, monospace; }
+
+.badge.unknown  { --c: #eab308; }

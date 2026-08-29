@@ -10,8 +10,12 @@ const POLL_MS = 3000;
 const rowsEl = document.getElementById('rows');
 const statusEl = document.getElementById('status');
 
-/** Pending approvals, keyed by session id, so the buttons can resume a turn. */
+/** Gated tool calls per session, so the buttons can resume the turn. */
 const pending = new Map();
+/** Sessions with a decision in flight, to keep decisions single-flight. */
+const inFlight = new Set();
+/** Guards against overlapping refreshes finishing out of order. */
+let refreshing = false;
 
 async function api(path, options) {
   const response = await fetch(`/api/v1${path}`, options);
@@ -48,33 +52,35 @@ function deriveState(rawEvents) {
 
   let state = 'queued';
   let steps = 0;
-  let awaiting = null;
   let failed = false;
+  const gated = [];
 
   for (const event of events) {
     switch (event.type) {
       case 'turn.created':
         state = 'running';
-        awaiting = null;
+        gated.length = 0;
         break;
       case 'tool.response':
         steps += 1;
         break;
       case 'tool.approval_required':
-        awaiting = {
-          threadId: event.thread_id,
-          toolCalls: event.tool_calls ?? [],
-          names: (event.tool_calls ?? []).map(nameFor).filter(Boolean),
-        };
+        // A turn can emit several approval-required events. Accumulate them:
+        // overwriting would leave the earlier gated calls unresolved, and the
+        // run could never resume.
+        for (const call of event.tool_calls ?? []) {
+          if (gated.some((g) => g.id === call.id)) continue;
+          gated.push({ id: call.id, threadId: event.thread_id, name: nameFor(call) });
+        }
         break;
       case 'turn.done':
         state = 'done';
-        awaiting = null;
+        gated.length = 0;
         break;
       case 'turn.failed':
       case 'error':
         failed = true;
-        awaiting = null;
+        gated.length = 0;
         break;
       default:
         break;
@@ -87,9 +93,9 @@ function deriveState(rawEvents) {
     }
   }
 
-  if (awaiting) return { state: 'waiting', steps, awaiting };
-  if (failed) return { state: 'failed', steps, awaiting: null };
-  return { state, steps, awaiting: null };
+  if (gated.length) return { state: 'waiting', steps, gated };
+  if (failed) return { state: 'failed', steps, gated: [] };
+  return { state, steps, gated: [] };
 }
 
 const LABELS = {
@@ -99,6 +105,7 @@ const LABELS = {
   waiting: 'awaiting approval',
   done: 'done',
   failed: 'failed',
+  unknown: 'state unavailable',
 };
 
 function relative(iso) {
@@ -110,30 +117,46 @@ function relative(iso) {
   return `${Math.round(seconds / 86400)}d ago`;
 }
 
-async function decide(sessionId, status) {
+async function decide(sessionId, status, buttons) {
+  // Claim the decision synchronously, before any await. Two rapid clicks -
+  // or approve then reject - would otherwise both pass the guard and submit
+  // contradictory decisions for the same tool calls.
   const waiting = pending.get(sessionId);
-  if (!waiting) return;
+  if (!waiting || inFlight.has(sessionId)) return;
+  inFlight.add(sessionId);
+  pending.delete(sessionId);
+  for (const button of buttons) button.disabled = true;
 
-  const input = waiting.toolCalls.map((call) => ({
+  const input = waiting.map((call) => ({
     type: 'user.tool_approval',
-    thread_id: waiting.threadId,
-    tool_call_id: call.id ?? call.tool_call_id,
+    thread_id: call.threadId,
+    tool_call_id: call.id,
     approval: status === 'allow'
       ? { status: 'allow' }
       : { status: 'deny', reason: 'Rejected from the Outsmart queue board.' },
   }));
 
-  await api(`/sessions/${sessionId}/turns`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ input, stream: false }),
-  });
+  try {
+    await api(`/sessions/${sessionId}/turns`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ input, stream: false }),
+    });
+  } catch (error) {
+    // Restore the gate: a failed submission must not look like a decision.
+    pending.set(sessionId, waiting);
+    for (const button of buttons) button.disabled = false;
+    statusEl.className = 'status error';
+    statusEl.textContent = `approval failed: ${error.message}`;
+    return;
+  } finally {
+    inFlight.delete(sessionId);
+  }
 
-  pending.delete(sessionId);
   await refresh();
 }
 
-function renderRow(session, { state, steps, awaiting }) {
+function renderRow(session, { state, steps, gated }) {
   const row = document.createElement('tr');
 
   const title = document.createElement('td');
@@ -144,7 +167,7 @@ function renderRow(session, { state, steps, awaiting }) {
   const stateCell = document.createElement('td');
   const badge = document.createElement('span');
   badge.className = `badge ${state}` + (['running', 'fixing', 'waiting'].includes(state) ? ' pulse' : '');
-  badge.textContent = LABELS[state];
+  badge.textContent = LABELS[state] ?? state;
   stateCell.append(badge);
 
   const activity = document.createElement('td');
@@ -156,19 +179,22 @@ function renderRow(session, { state, steps, awaiting }) {
   stepCell.textContent = steps ? `${steps} tool calls` : '—';
 
   const actions = document.createElement('td');
-  if (awaiting) {
-    const names = awaiting.names ?? [];
+  if (gated.length) {
+    const names = gated.map((g) => g.name).filter(Boolean);
     const label = document.createElement('span');
     label.className = 'pending-tool';
-    label.textContent = names.length ? names.join(', ') : 'tool call';
+    label.textContent = names.length ? names.join(', ') : `${gated.length} tool call(s)`;
+
     const approve = document.createElement('button');
     approve.className = 'approve';
     approve.textContent = 'Approve';
-    approve.onclick = () => decide(session.id, 'allow');
     const reject = document.createElement('button');
     reject.className = 'reject';
     reject.textContent = 'Reject';
-    reject.onclick = () => decide(session.id, 'deny');
+    const buttons = [approve, reject];
+    approve.onclick = () => decide(session.id, 'allow', buttons);
+    reject.onclick = () => decide(session.id, 'deny', buttons);
+
     actions.append(label, approve, document.createTextNode(' '), reject);
   } else {
     actions.className = 'muted';
@@ -180,29 +206,47 @@ function renderRow(session, { state, steps, awaiting }) {
 }
 
 async function refresh() {
+  // Skip if a refresh is still running. Overlapping refreshes can finish out
+  // of order, and a slow one landing last would re-expose a gate that a newer
+  // pass already saw resolved.
+  if (refreshing) return;
+  refreshing = true;
+
   try {
     const { data: sessions } = await api('/sessions');
     const rows = [];
+    let unreadable = 0;
 
     for (const session of sessions) {
-      let derived = { state: 'queued', steps: 0, awaiting: null };
+      let derived;
       try {
         const { data: events } = await api(`/sessions/${session.id}/events`);
         derived = deriveState(events);
       } catch {
-        // A session whose events cannot be read is still worth showing.
+        // Never fall back to "queued" - an unreadable run is not an idle one,
+        // and an operator must be able to tell the difference.
+        derived = { state: 'unknown', steps: 0, gated: [] };
+        unreadable += 1;
       }
-      if (derived.awaiting) pending.set(session.id, derived.awaiting);
-      else pending.delete(session.id);
+
+      // A decision in flight owns this session's gate until it resolves.
+      if (!inFlight.has(session.id)) {
+        if (derived.gated.length) pending.set(session.id, derived.gated);
+        else pending.delete(session.id);
+      }
       rows.push(renderRow(session, derived));
     }
 
     rowsEl.replaceChildren(...(rows.length ? rows : [emptyRow()]));
-    statusEl.className = 'status';
-    statusEl.textContent = `${sessions.length} runs · updated ${new Date().toLocaleTimeString()}`;
+    statusEl.className = unreadable ? 'status error' : 'status';
+    statusEl.textContent = unreadable
+      ? `${sessions.length} runs · ${unreadable} unreadable · updated ${new Date().toLocaleTimeString()}`
+      : `${sessions.length} runs · updated ${new Date().toLocaleTimeString()}`;
   } catch (error) {
     statusEl.className = 'status error';
     statusEl.textContent = error.message;
+  } finally {
+    refreshing = false;
   }
 }
 
