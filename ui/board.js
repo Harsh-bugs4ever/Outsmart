@@ -23,48 +23,72 @@ async function api(path, options) {
 /**
  * Reduce a session's events to a single state.
  *
- * Order matters: an approval that is still outstanding outranks "running",
- * because a run waiting on a human is the thing an operator needs to see.
+ * The API returns events newest-first, so they are sorted chronologically
+ * before reducing - reducing in array order ends on the oldest `turn.created`
+ * and reports a finished run as still running.
+ *
+ * There is no `user.tool_approval` event in the stream: an approval's
+ * resolution shows up as the turn simply completing. So an approval counts as
+ * outstanding only while nothing later has closed or restarted the turn.
  */
-function deriveState(events) {
+function deriveState(rawEvents) {
+  const events = rawEvents
+    .map((entry) => entry.event ?? entry)
+    .filter((event) => event?.created_at)
+    .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+
+  // Tool names live on the model message that requested the call, which an
+  // approval references by `source_event_id`.
+  const byId = new Map(events.map((event) => [event.id, event]));
+  const nameFor = (call) => {
+    const source = byId.get(call.source_event_id);
+    const match = (source?.tool_calls ?? []).find((c) => c.id === call.id);
+    return match?.function?.name ?? match?.name ?? null;
+  };
+
   let state = 'queued';
   let steps = 0;
   let awaiting = null;
   let failed = false;
 
-  for (const { event } of events) {
+  for (const event of events) {
     switch (event.type) {
       case 'turn.created':
         state = 'running';
+        awaiting = null;
         break;
       case 'tool.response':
         steps += 1;
         break;
       case 'tool.approval_required':
-        awaiting = { threadId: event.thread_id, toolCalls: event.tool_calls ?? [] };
-        break;
-      case 'user.tool_approval':
-        awaiting = null;
+        awaiting = {
+          threadId: event.thread_id,
+          toolCalls: event.tool_calls ?? [],
+          names: (event.tool_calls ?? []).map(nameFor).filter(Boolean),
+        };
         break;
       case 'turn.done':
         state = 'done';
+        awaiting = null;
         break;
       case 'turn.failed':
       case 'error':
         failed = true;
+        awaiting = null;
         break;
       default:
         break;
     }
 
-    // "fixing" is not a harness concept - it is the repair loop, which shows up
-    // as the agent running tests or editing files after a failure.
-    const text = JSON.stringify(event);
-    if (state === 'running' && /npm test|mocha|failing|repair/i.test(text)) state = 'fixing';
+    // "fixing" is not a harness concept - it is the repair loop, visible as the
+    // agent running tests or patching after a failure.
+    if (state === 'running' && /npm test|mocha|failing|repair/i.test(JSON.stringify(event))) {
+      state = 'fixing';
+    }
   }
 
-  if (failed) return { state: 'failed', steps, awaiting: null };
   if (awaiting) return { state: 'waiting', steps, awaiting };
+  if (failed) return { state: 'failed', steps, awaiting: null };
   return { state, steps, awaiting: null };
 }
 
@@ -133,7 +157,7 @@ function renderRow(session, { state, steps, awaiting }) {
 
   const actions = document.createElement('td');
   if (awaiting) {
-    const names = awaiting.toolCalls.map((c) => c.function?.name ?? c.name).filter(Boolean);
+    const names = awaiting.names ?? [];
     const label = document.createElement('span');
     label.className = 'pending-tool';
     label.textContent = names.length ? names.join(', ') : 'tool call';
