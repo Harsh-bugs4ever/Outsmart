@@ -170,6 +170,47 @@ upstream:
   the sandbox, so every sandbox init fails during its bootstrap. Running with
   `TMPDIR=/tmp/claude` works around it.
 
+## Qodo Code Review Evidence
+
+Qodo reviewed every pull request in this repository. It raised **25 findings
+across 7 PRs**; 22 were fixed and 3 were refuted with evidence in the thread.
+Every PR below is merged.
+
+| PR | What it added | Qodo findings |
+|---|---|---|
+| [#2](https://github.com/Harsh-bugs4ever/Outsmart/pull/2) | Deployment: provisioning, systemd, TLS, allowlist patch | 2 — loopback binding *(refuted, hardened anyway)*, inconsistent runtime user |
+| [#3](https://github.com/Harsh-bugs4ever/Outsmart/pull/3) | Fixes from #2's review | 4 — primary-group assumption, placeholder in manual install, a commented `\` that silently discarded output, `$USER` resolving to root |
+| [#5](https://github.com/Harsh-bugs4ever/Outsmart/pull/5) | The `npm-upgrade` Skill and its scanner | 7 — aliased packages, pagination, link entries, root entry, v1 transitives, legacy tree, truncated responses |
+| [#6](https://github.com/Harsh-bugs4ever/Outsmart/pull/6) | Attaching the Skill to the agent | 2 — skill not registered on a fresh deployment; reload dropping the skill *(refuted)* |
+| [#7](https://github.com/Harsh-bugs4ever/Outsmart/pull/7) | Queue board and approval controls | 10 — racing decisions, dropped parallel approvals, overlapping polls, unreadable state shown as queued, and four passes on the `fixing` heuristic |
+| [#9](https://github.com/Harsh-bugs4ever/Outsmart/pull/9) | A paused run is not a finished run | — |
+
+### What the review actually caught
+
+Almost every finding in #5 was the same species: **a way for the scanner to
+report fewer advisories without erroring.** An alias queries a package that
+isn't installed. An unfollowed `next_page_token` truncates the answer. A short
+response paired with `zip()` drops the unmatched packages and still prints a
+clean summary. None of those throw; all of them produce a confident "you're
+clean". The scanner now refuses to continue when the response doesn't match
+what it asked for.
+
+### Three findings were refuted, with evidence
+
+Disagreeing was part of using the tool properly:
+
+- **"Harness binds all interfaces"** (#2) — TrueForge sets
+  `DEFAULT_HOST = "localhost"` and passes it to `@hono/node-server` as
+  `hostname`; `netstat` on a live instance showed loopback only. The concern
+  about depending on an upstream default was fair, so `HOST=127.0.0.1` is now
+  set explicitly.
+- **"Reload drops configured skill"** (#6) — `load-agent.sh` sends the whole
+  manifest, and `skills` lives inside it. Verified against a running harness:
+  reloaded through the update path, skill still attached.
+- **"Lifecycle events never listed"** (#7) — `turn.created` and `turn.done`
+  *are* returned by the listing endpoint. Verified across eight live sessions.
+  The real bug nearby was ordering, which was fixed.
+
 ## Built with
 
 - [TrueForge](https://trueforge.dev) — the agent harness
