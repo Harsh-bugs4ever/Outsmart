@@ -78,9 +78,12 @@ function deriveState(rawEvents) {
         }
         break;
       case 'turn.done':
+        // A turn ends when it pauses for approval too - the harness emits
+        // turn.done a millisecond after tool.approval_required. So this must
+        // not clear the gate, or a run waiting on a human reports as done.
+        // Only the resumed turn (turn.created) clears it.
         state = 'done';
         failed = false;
-        gated.length = 0;
         break;
       case 'turn.failed':
       case 'error':
