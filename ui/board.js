@@ -58,7 +58,11 @@ function deriveState(rawEvents) {
   for (const event of events) {
     switch (event.type) {
       case 'turn.created':
+        // A new turn supersedes whatever the previous one did, including a
+        // failure - otherwise one bad turn marks the session failed forever,
+        // even after a successful retry.
         state = 'running';
+        failed = false;
         gated.length = 0;
         break;
       case 'tool.response':
@@ -75,6 +79,7 @@ function deriveState(rawEvents) {
         break;
       case 'turn.done':
         state = 'done';
+        failed = false;
         gated.length = 0;
         break;
       case 'turn.failed':
@@ -86,9 +91,11 @@ function deriveState(rawEvents) {
         break;
     }
 
-    // "fixing" is not a harness concept - it is the repair loop, visible as the
-    // agent running tests or patching after a failure.
-    if (state === 'running' && /npm test|mocha|failing|repair/i.test(JSON.stringify(event))) {
+    // "fixing" is not a harness concept - it is the repair loop. Every run
+    // executes `npm test` for its green baseline, so matching the command
+    // labels healthy runs as repair work from the baseline onward. Match
+    // evidence of a *failure* instead.
+    if (state === 'running' && /\d+\s+failing|tests? failed|npm ERR!|AssertionError/i.test(JSON.stringify(event))) {
       state = 'fixing';
     }
   }
