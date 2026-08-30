@@ -26,22 +26,17 @@ flowchart TD
     D -->|none| E[Report: clean]
     D -->|yes| F[Plan by semver<br/>batch minor · split major]
     F --> G[One subagent per advisory<br/>own branch · own sandbox]
-    G --> H[Bump → install → run tests]
-    H --> I{Green?}
-    I -->|no| J[Read the failure<br/>patch the source]
-    J --> K{3 attempts?}
-    K -->|no| H
-    K -->|yes| L[Write a report<br/>not a pull request]
-    I -->|yes| M[Re-verify from a clean checkout<br/>of the MERGED state]
-    M --> N{Still green?}
-    N -->|no| L
-    N -->|yes| O[Open a pull request]
+    G --> H[Bump · install · test<br/>read failures and patch the source<br/>up to 3 attempts]
+    H -->|still failing| L[Write a report<br/>not a pull request]
+    H -->|green| M[Re-verify from a clean checkout<br/>of the MERGED state]
+    M -->|fails| L
+    M -->|green| O[Open a pull request]
     O --> P[/Human approval gate/]
-    P --> Q[Merge — human only<br/>the agent has no merge tool]
+    P --> R[Merge — human only<br/>the agent has no merge tool]
 
     style P fill:#a855f7,stroke:#7e22ce,color:#fff
     style L fill:#f59e0b,stroke:#b45309,color:#000
-    style Q fill:#22c55e,stroke:#15803d,color:#000
+    style R fill:#22c55e,stroke:#15803d,color:#000
 ```
 
 Two steps in that diagram are the ones that matter, and both are about not
