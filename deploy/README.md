@@ -110,6 +110,28 @@ It reads the repository URL from the `origin` remote and pins `main`; override
 with `OUTSMART_REPO_URL` and `OUTSMART_REPO_REF` when deploying from a fork or
 a tag.
 
+## 6. The queue board
+
+The board is a separate process: it serves the UI and proxies `/api` to the
+harness, so both are on one origin. The harness sends no CORS headers, and
+loosening that would be the wrong fix given it has no authentication.
+
+```bash
+node ui/server.mjs --port 8791 --harness http://localhost:8790
+```
+
+Point Caddy at the board rather than the harness, so operators reach the queue
+and the harness stays unexposed:
+
+```
+reverse_proxy 127.0.0.1:8791 {
+	flush_interval -1
+}
+```
+
+Run it under systemd alongside the harness for anything long-lived. Both must
+be bound to loopback; only Caddy should be reachable.
+
 ## Security notes
 
 - The harness has **no authentication of its own**. If Caddy is not in front of

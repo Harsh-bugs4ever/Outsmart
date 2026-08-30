@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Outsmart — queue</title>
+<link rel="stylesheet" href="/board.css">
+</head>
+<body>
+  <header>
+    <h1>Outsmart</h1>
+    <p class="sub">Dependency upgrades, repaired and verified. Merging stays a human decision.</p>
+    <p class="status" id="status">connecting…</p>
+  </header>
+
+  <table id="board">
+    <thead>
+      <tr>
+        <th>Run</th>
+        <th>State</th>
+        <th>Last activity</th>
+        <th>Steps</th>
+        <th class="actions-col">Approval</th>
+      </tr>
+    </thead>
+    <tbody id="rows">
+      <tr class="empty"><td colspan="5">No runs yet.</td></tr>
+    </tbody>
+  </table>
+
+  <script type="module" src="/board.js"></script>
+</body>
+</html>
