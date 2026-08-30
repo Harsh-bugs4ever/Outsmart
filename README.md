@@ -20,7 +20,7 @@ anything.
 
 ```mermaid
 flowchart TD
-    A[Target repository] --> B[Resolve the lockfile<br/><i>not the manifest</i>]
+    A[Target repository] --> B[Resolve the lockfile<br/>not the manifest]
     B --> C[Scan every package<br/>against OSV.dev]
     C --> D{Advisories?}
     D -->|none| E[Report: clean]
@@ -31,8 +31,8 @@ flowchart TD
     I -->|no| J[Read the failure<br/>patch the source]
     J --> K{3 attempts?}
     K -->|no| H
-    K -->|yes| L[Write a report<br/><i>not a pull request</i>]
-    I -->|yes| M[Re-verify from a clean checkout<br/>of the <b>merged</b> state]
+    K -->|yes| L[Write a report<br/>not a pull request]
+    I -->|yes| M[Re-verify from a clean checkout<br/>of the MERGED state]
     M --> N{Still green?}
     N -->|no| L
     N -->|yes| O[Open a pull request]
