@@ -172,18 +172,23 @@ upstream:
 
 ## Qodo Code Review Evidence
 
-Qodo reviewed every pull request in this repository. It raised **25 findings
-across 7 PRs**; 22 were fixed and 3 were refuted with evidence in the thread.
-Every PR below is merged.
+Qodo reviewed **every pull request** in this repository — all eleven. It raised
+**25 findings across 5 of them**; 22 were fixed and 3 were refuted with
+evidence in the thread. Five PRs came back with nothing.
 
 | PR | What it added | Qodo findings |
 |---|---|---|
+| [#1](https://github.com/Harsh-bugs4ever/Outsmart/pull/1) | Initial README | none |
 | [#2](https://github.com/Harsh-bugs4ever/Outsmart/pull/2) | Deployment: provisioning, systemd, TLS, allowlist patch | 2 — loopback binding *(refuted, hardened anyway)*, inconsistent runtime user |
-| [#3](https://github.com/Harsh-bugs4ever/Outsmart/pull/3) | Fixes from #2's review | 4 — primary-group assumption, placeholder in manual install, a commented `\` that silently discarded output, `$USER` resolving to root |
+| [#3](https://github.com/Harsh-bugs4ever/Outsmart/pull/3) | Fixes from #2's review | 4 — primary-group assumption, placeholder left in the manual install, a commented continuation that silently discarded output, `$USER` resolving to root |
+| [#4](https://github.com/Harsh-bugs4ever/Outsmart/pull/4) | Agent output limits and a single commit identity | none |
 | [#5](https://github.com/Harsh-bugs4ever/Outsmart/pull/5) | The `npm-upgrade` Skill and its scanner | 7 — aliased packages, pagination, link entries, root entry, v1 transitives, legacy tree, truncated responses |
 | [#6](https://github.com/Harsh-bugs4ever/Outsmart/pull/6) | Attaching the Skill to the agent | 2 — skill not registered on a fresh deployment; reload dropping the skill *(refuted)* |
 | [#7](https://github.com/Harsh-bugs4ever/Outsmart/pull/7) | Queue board and approval controls | 10 — racing decisions, dropped parallel approvals, overlapping polls, unreadable state shown as queued, and four passes on the `fixing` heuristic |
-| [#9](https://github.com/Harsh-bugs4ever/Outsmart/pull/9) | A paused run is not a finished run | — |
+| [#8](https://github.com/Harsh-bugs4ever/Outsmart/pull/8) | Submission README and flowchart | none |
+| [#9](https://github.com/Harsh-bugs4ever/Outsmart/pull/9) | A run paused for approval is not a finished run | none |
+| [#10](https://github.com/Harsh-bugs4ever/Outsmart/pull/10) | The Qodo evidence section | none |
+| [#11](https://github.com/Harsh-bugs4ever/Outsmart/pull/11) | Completing this table | none |
 
 ### What the review actually caught
 
