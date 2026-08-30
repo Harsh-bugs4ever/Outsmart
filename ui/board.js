@@ -94,8 +94,9 @@ function deriveState(rawEvents) {
     // "fixing" is not a harness concept - it is the repair loop. Every run
     // executes `npm test` for its green baseline, so matching the command
     // labels healthy runs as repair work from the baseline onward. Match
-    // evidence of a *failure* instead.
-    if (state === 'running' && /\d+\s+failing|tests? failed|npm ERR!|AssertionError/i.test(JSON.stringify(event))) {
+    // evidence of a *failure* instead - and a non-zero count, since some
+    // reporters print "0 failing" on a healthy run.
+    if (state === 'running' && /[1-9]\d*\s+failing|tests? failed|npm ERR!|AssertionError/i.test(JSON.stringify(event))) {
       state = 'fixing';
     }
   }
