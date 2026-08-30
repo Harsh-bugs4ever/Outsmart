@@ -16,6 +16,38 @@ Detection is solved — Dependabot, `npm audit` and OSV all find the advisory.
 reads the failure, patches the source, and re-verifies before it asks you for
 anything.
 
+## The flow
+
+```mermaid
+flowchart TD
+    A[Target repository] --> B[Resolve the lockfile<br/><i>not the manifest</i>]
+    B --> C[Scan every package<br/>against OSV.dev]
+    C --> D{Advisories?}
+    D -->|none| E[Report: clean]
+    D -->|yes| F[Plan by semver<br/>batch minor · split major]
+    F --> G[One subagent per advisory<br/>own branch · own sandbox]
+    G --> H[Bump → install → run tests]
+    H --> I{Green?}
+    I -->|no| J[Read the failure<br/>patch the source]
+    J --> K{3 attempts?}
+    K -->|no| H
+    K -->|yes| L[Write a report<br/><i>not a pull request</i>]
+    I -->|yes| M[Re-verify from a clean checkout<br/>of the <b>merged</b> state]
+    M --> N{Still green?}
+    N -->|no| L
+    N -->|yes| O[Open a pull request]
+    O --> P[/Human approval gate/]
+    P --> Q[Merge — human only<br/>the agent has no merge tool]
+
+    style P fill:#a855f7,stroke:#7e22ce,color:#fff
+    style L fill:#f59e0b,stroke:#b45309,color:#000
+    style Q fill:#22c55e,stroke:#15803d,color:#000
+```
+
+Two steps in that diagram are the ones that matter, and both are about not
+trusting the agent: the **retry cap** (a report is a valid outcome, a false
+green is not) and the **re-verify against the merged state**, explained below.
+
 ## How it works
 
 1. **Resolve the real tree.** Advisories live in the lockfile, not the
@@ -45,16 +77,22 @@ tests and a clean diff.
 Three correct agents, one wrong result. No per-branch check can catch that,
 which is why verification runs against the merged state.
 
-## What it demonstrates
+## Best Use of TrueForge — where each capability is exercised
 
-| TrueForge capability | Where |
-|---|---|
-| **MCP** | GitHub connector — reads manifests, creates branches, opens PRs |
-| **Sandbox** | every install, test run and repair happens in a bubblewrap sandbox; credentials never enter it |
-| **Approval gate** | `require_approval_for_tools: ["@write","@destructive"]`, plus `merge_pull_request` disabled outright |
-| **Subagents** | one worker per advisory, parallel, isolated branches |
-| **Session durability** | runs continue server-side with no client attached; close the browser and reopen |
-| **Skills** | `skills/npm-upgrade` — ships a tested scanner, cloned into the sandbox only when relevant |
+The track names six things. Here is where each one lives, so you can check
+rather than take my word for it.
+
+| Capability | Where | Verify it |
+|---|---|---|
+| **MCP** | GitHub connector: reads manifests, forks, creates branches, opens PRs | `agents/outsmart.json` → `mcp_servers` |
+| **Sandbox** | every install, test run and repair executes in a bubblewrap sandbox; model and MCP credentials never enter it | `config.sandbox.enabled` |
+| **Approval gate** | writes pause for a human, and `merge_pull_request` is removed from the agent's toolset entirely | `require_approval_for_tools`, `disable_tools` |
+| **Subagents** | one worker per advisory, running in parallel on isolated branches | `config.dynamic_sub_agents` |
+| **Session durability** | runs continue server-side with no client attached — close the browser mid-run and reopen | the reconnect clip in the demo |
+| **Skills** | `skills/npm-upgrade` ships a *tested scanner*, cloned into the sandbox only when the model finds it relevant | `skills/npm-upgrade/scripts/scan_lockfile.py` |
+
+The agent isn't asked politely not to merge. **The tool is not there** — 43 of
+GitHub's 44 MCP tools are enabled, and `merge_pull_request` is the exception.
 
 ## Quick start
 
